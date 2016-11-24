@@ -1,130 +1,92 @@
-/*
 google.charts.load('current', { 'packages': ['corechart', 'bar', 'line'] });
 google.charts.setOnLoadCallback(drawChart);
 
 function drawChart() {
-
-  // var truncationLength = 40;
-  // var truncatedSessionTitle = session.title.substr(0, truncationLength - 1) + (session.title.length > truncationLength ? '…' : '');
-
-
-  var $accordion = $('#accordion');
-  var $chartDiv = $('#chart-div');
-  if (searchParams.has("uuid")) {
-    var uuid = searchParams.get("uuid");
-    var statURL = 'https://vdf2016r.firebaseapp.com/uuid-' + uuid + '.jsonp';
-    $.getJSON(statURL, function(stat) {
-      var chartData = [
-        [
-          "Category",
-          "Your Session's Median",
-          "Conference Median Avergae",
-          "Your Session's Average",
-          "Conference Avergae"
-        ]
-      ];
-      var rating = stat.rating;
-
-      aggregateData.categoryNames.forEach(function(categoryName) {
-        var categoryRating = rating[categoryName];
-        if (categoryRating.values > 0) {
-          chartData.push([
-            categoryName,
-            categoryRating.median,
-            aggregateData[categoryName].median,
-            categoryRating.avg,
-            aggregateData[categoryName].avg
-          ]);
-
-          $accordion.append(
-            '<div class="panel panel-default">' +
-            '  <div class="panel-heading" role="tab" id="' + categoryName + 'Heading">' +
-            '    <h4 class="panel-title">' +
-            '      <a role="button" class="accordion-header" data-toggle="collapse" data-parent="#accordion" href="#collapse' + categoryName + '" aria-expanded="true" aria-controls="collapse' + categoryName + '">' +
-            '        ' + categoryName + ' rating distribution' +
-            '      </a>' +
-            '    </h4>' +
-            '  </div>' +
-            '  <div id="collapse' + categoryName + '" class="panel-collapse collapse" role="tabpanel" aria-labelledby="' + categoryName + 'Heading">' +
-            '    <div class="panel-body">' +
-            '      <div id="' + categoryName + 'Div" class="chart-div">' +
-            '        <p>No data</p>' +
-            '      </div>' +
-            '    </div>' +
-            '  </div>' +
-            '</div>'
-          )
-
-          // var distribData = [
-          //   [
-          //     'Rating',
-          //     'Session',
-          //     'Conference (normalized)'
-          //   ]
-          // ];
-          var distribData = new google.visualization.DataTable();
-          distribData.addColumn('string', 'Rating');
-          distribData.addColumn('number', 'Your Session');
-          distribData.addColumn('number', 'Conference (normalized)');
-          var numRates = aggregateData.ratingTitles.length;
-          sumAggrDistrib = aggregateData[categoryName].distribution.reduce(function(a, b) {return a + b});
-          sumDistrib = categoryRating.distribution.reduce(function(a, b) {return a + b});
-          for (var i = 0; i < numRates; i++) {
-            // distribData.push([
-            //   aggregateData.ratingTitles[i],
-            //   categoryRating.distribution[i],
-            //   aggregateData[categoryName].distribution[i] * sumDistrib / sumAggrDistrib
-            // ]);
-            distribData.addRow([
-              aggregateData.ratingTitles[i],
-              categoryRating.distribution[i],
-              aggregateData[categoryName].distribution[i] * sumDistrib / sumAggrDistrib
-            ]);
-          }
-          // var dData = google.visualization.arrayToDataTable(distribData);
-          // var $chartDiv = $('#' + categoryName + 'Div');
-          var options = {
-            width: $chartDiv.width(),
-            height: $chartDiv.height(),
-            title: stat.title + ' \u2014 ' + categoryName + ' rating distribution',
-            subtitle: '',
-            curveType: 'function',
-            pointSize: 7,
-            hAxis: { slantedText: true }
-          }
-          var dChart = new google.visualization.LineChart(document.getElementById(categoryName + 'Div'));
-          dChart.draw(distribData, options);
-        } else {
-          chartData.push([categoryName, null, null, null, null]);
-        }
-      });
-      if (stat.comments.length > 0) {
-        var commentsHtml = '<ul>';
-        stat.comments.forEach(function (comment) {
-          commentsHtml += '<li>' + comment + '</li>';
-        });
-        commentsHtml += '</ul>';
-        $('#commentBody').html(commentsHtml);
-      }
-      var data = google.visualization.arrayToDataTable(chartData);
-      var options = {
-        width: $chartDiv.width(),
-        height: $chartDiv.height(),
-        chart: {
-          title: stat.title,
-          subtitle: ''
-        }
-      }
-      var chart = new google.charts.Bar(document.getElementById('chart-div'));
-      chart.draw(data, options);
-    }).fail(function() {
-      $chartDiv.html("Couldn't download stat. Wrong GUID?");
+  var truncationLength = 40;
+  aggregateData.categoryNames.forEach(function(categoryName) {
+    var dtAvg = new google.visualization.DataTable();
+    var dtMedian = new google.visualization.DataTable();
+    dtAvg.addColumn('string', 'Session');
+    dtAvg.addColumn('number', 'Avg');
+    dtAvg.addColumn('number', 'Conference Avg');
+    whole.sort(function(a, b){return b[categoryName].avg - a[categoryName].avg}).forEach(function(sessionEntry) {
+      var truncatedSessionTitle = sessionEntry.name.substr(0, truncationLength - 1) + (sessionEntry.name.length > truncationLength ? '…' : '') + ' (' + sessionEntry[categoryName].sampleSize + ')';
+      dtAvg.addRows([[
+        truncatedSessionTitle,
+        sessionEntry[categoryName].avg,
+        aggregateData[categoryName].avg,
+      ]]);
     });
-  } else {
-    $chartDiv.html('Need UUID URL parameter');
-  }
+    dtMedian.addColumn('string', 'Session');
+    dtMedian.addColumn('number', 'Median');
+    dtMedian.addColumn('number', 'Conference Median');
+    whole.sort(function(a, b){return b[categoryName].median - a[categoryName].median}).forEach(function(sessionEntry) {
+      var truncatedSessionTitle = sessionEntry.name.substr(0, truncationLength - 1) + (sessionEntry.name.length > truncationLength ? '…' : '') + ' (' + sessionEntry[categoryName].sampleSize + ')';
+      dtMedian.addRows([[
+        truncatedSessionTitle,
+        sessionEntry[categoryName].median,
+        aggregateData[categoryName].median
+      ]]);
+    });
+
+    var $accordion = $('#accordion');
+
+    $accordion.append(
+      '<div class="panel panel-default">' +
+      '  <div class="panel-heading" role="tab" id="' + categoryName + 'AvgHeading">' +
+      '    <h4 class="panel-title">' +
+      '      <a role="button" class="accordion-header collapsed" data-toggle="collapse" data-parent="#accordion" href="#collapse' + categoryName + 'Avg" aria-expanded="true" aria-controls="collapse' + categoryName + 'Avg">' +
+      '        ' + categoryName + ' averages' +
+      '      </a>' +
+      '    </h4>' +
+      '  </div>' +
+      '  <div id="collapse' + categoryName + 'Avg" class="panel-collapse collapse" role="tabpanel" aria-labelledby="' + categoryName + 'AvgHeading">' +
+      '    <div class="panel-body">' +
+      '      <div id="' + categoryName + 'AvgDiv" class="chart-div">' +
+      '        <p>No data</p>' +
+      '      </div>' +
+      '    </div>' +
+      '  </div>' +
+      '</div>' +
+      '<div class="panel panel-default">' +
+      '  <div class="panel-heading" role="tab" id="' + categoryName + 'MedianHeading">' +
+      '    <h4 class="panel-title">' +
+      '      <a role="button" class="accordion-header collapsed" data-toggle="collapse" data-parent="#accordion" href="#collapse' + categoryName + 'Median" aria-expanded="true" aria-controls="collapse' + categoryName + 'Median">' +
+      '        ' + categoryName + ' medians' +
+      '      </a>' +
+      '    </h4>' +
+      '  </div>' +
+      '  <div id="collapse' + categoryName + 'Median" class="panel-collapse collapse" role="tabpanel" aria-labelledby="' + categoryName + 'MedianHeading">' +
+      '    <div class="panel-body">' +
+      '      <div id="' + categoryName + 'MedianDiv" class="chart-div">' +
+      '        <p>No data</p>' +
+      '      </div>' +
+      '    </div>' +
+      '  </div>' +
+      '</div>'
+    )
+
+    var $chartAvgDiv = $('#' + categoryName + 'AvgDiv');
+    var series = {};
+    series[1] = {type: 'line'};
+    var options = {
+      width: 1100,  // $chartAvgDiv.width(),
+      height: $chartAvgDiv.height(),
+      title: categoryName,
+      subtitle: '',
+      seriesType: 'bars',
+      series: series,
+      hAxis: { slantedText: true },
+      theme: 'material'
+    }
+
+    var dAvgChart = new google.visualization.ComboChart(document.getElementById(categoryName + 'AvgDiv'));
+    dAvgChart.draw(dtAvg, options);
+    var dMedianChart = new google.visualization.ComboChart(document.getElementById(categoryName + 'MedianDiv'));
+    dMedianChart.draw(dtMedian, options);
+  });
 }
-*/
+
 (function (document, $) {
   var tableData = [];
   whole.forEach(function(sessionEntry) {
